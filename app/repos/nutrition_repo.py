@@ -9,6 +9,9 @@ class SqlAlchemyNutritionRepository(NutritionRepository):
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    def get_by_id(self, reference_id: int) -> NutritionReference | None:
+        return self._session.get(NutritionReference, reference_id)
+
     def get_by_normalized_name(self, name_normalized: str) -> NutritionReference | None:
         return self._session.scalar(
             select(NutritionReference).where(

@@ -23,6 +23,9 @@ class UserRepository(ABC):
 
 class NutritionRepository(ABC):
     @abstractmethod
+    def get_by_id(self, reference_id: int) -> NutritionReference | None: ...
+
+    @abstractmethod
     def get_by_normalized_name(self, name_normalized: str) -> NutritionReference | None: ...
 
     @abstractmethod
