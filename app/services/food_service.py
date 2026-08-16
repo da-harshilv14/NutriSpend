@@ -3,7 +3,12 @@ from datetime import date
 
 from app.core.dates import today
 from app.db.models import FoodLog
-from app.nutrition.lookup import LookupResult, NutritionLookup, needs_confirmation
+from app.nutrition.lookup import (
+    UNVERIFIED_SOURCES,
+    LookupResult,
+    NutritionLookup,
+    needs_confirmation,
+)
 from app.nutrition.portions import PortionEstimate, resolve_portion
 from app.nutrition.scaling import TRACKED, scale_nutrition
 from app.repos.interfaces import FoodLogRepository, NutritionRepository
@@ -53,6 +58,9 @@ class FoodService:
         reference = self._nutrition_repo.get_by_id(nutrition_id)
         if reference is None:
             raise ValueError(f"unknown nutrition_id: {nutrition_id}")
+        is_estimate = reference.source in UNVERIFIED_SOURCES
+        if is_estimate:
+            reference.source = "user"  # a user chose to log it -> now verified
         portion = resolve_portion(portion_text)
         snapshot = scale_nutrition(reference, portion.grams)
         entry = FoodLog(
@@ -61,9 +69,28 @@ class FoodService:
             nutrition_id=nutrition_id,
             quantity_grams=portion.grams,
             portion_text=portion_text,
+            is_estimate=is_estimate,
             **snapshot,
         )
         return self._food_repo.add(entry)
+
+    def reference_name(self, nutrition_id: int | None) -> str | None:
+        if nutrition_id is None:
+            return None
+        reference = self._nutrition_repo.get_by_id(nutrition_id)
+        return reference.name if reference else None
+
+    def list_for_period(self, *, user_id: int, start: date, end: date) -> list[FoodLog]:
+        return self._food_repo.list_for_period(user_id, start, end)
+
+    def list_with_names(self, *, user_id: int, start: date, end: date) -> list[tuple[FoodLog, str | None]]:
+        """Food entries paired with their dish name (from nutrition_reference)."""
+        entries = self._food_repo.list_for_period(user_id, start, end)
+        result: list[tuple[FoodLog, str | None]] = []
+        for entry in entries:
+            reference = self._nutrition_repo.get_by_id(entry.nutrition_id) if entry.nutrition_id else None
+            result.append((entry, reference.name if reference else None))
+        return result
 
     def summary(self, *, user_id: int, start: date, end: date) -> dict:
         entries = self._food_repo.list_for_period(user_id, start, end)

@@ -30,6 +30,9 @@ class ExpenseService:
         )
         return self._expense_repo.add(entry)
 
+    def list_for_period(self, *, user_id: int, start: date, end: date) -> list[ExpenseLog]:
+        return self._expense_repo.list_for_period(user_id, start, end)
+
     def summary(self, *, user_id: int, start: date, end: date) -> dict:
         entries = self._expense_repo.list_for_period(user_id, start, end)
         total = sum((entry.amount for entry in entries), Decimal("0"))

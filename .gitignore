@@ -1,7 +1,23 @@
+# Python
 __pycache__/
 *.pyc
-.env
-.venv/
-venv/
 *.egg-info/
 .pytest_cache/
+
+# Virtualenv
+.venv/
+venv/
+
+# Secrets & config — .env.example IS committed as the template
+.env
+
+# Runtime logs (structured JSON per run)
+logs/
+
+# Internal design docs (not for the public repo)
+docs/superpowers/
+
+# Editor / OS noise
+.idea/
+.vscode/
+.DS_Store

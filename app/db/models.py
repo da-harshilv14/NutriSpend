@@ -19,6 +19,16 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     api_key: Mapped[str | None] = mapped_column(String(255), default=None)
+
+    # Daily targets shown on the Today screen. Defaults are the app's starting
+    # values; the user can change them from Profile.
+    daily_budget: Mapped[float] = mapped_column(default=1500.0)
+    daily_calories: Mapped[float] = mapped_column(default=2100.0)
+    daily_protein: Mapped[float] = mapped_column(default=90.0)
+    daily_carbs: Mapped[float] = mapped_column(default=260.0)
+    daily_fats: Mapped[float] = mapped_column(default=70.0)
+    daily_sugar: Mapped[float] = mapped_column(default=40.0)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -68,6 +78,10 @@ class FoodLog(Base):
     carbs: Mapped[float | None] = mapped_column(default=None)
     fats: Mapped[float | None] = mapped_column(default=None)
     sugar: Mapped[float | None] = mapped_column(default=None)
+
+    # True if the nutrition came from a web estimate at log time (kept forever,
+    # even after the cached reference row is promoted to a verified source).
+    is_estimate: Mapped[bool] = mapped_column(default=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

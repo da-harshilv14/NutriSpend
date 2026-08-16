@@ -38,3 +38,6 @@ class AuthService:
 
     def set_api_key(self, *, user_id: int, api_key: str) -> User | None:
         return self._user_repo.set_api_key(user_id, api_key)
+
+    def set_goals(self, *, user_id: int, goals: dict[str, float]) -> User | None:
+        return self._user_repo.set_goals(user_id, goals)

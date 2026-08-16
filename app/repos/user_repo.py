@@ -30,3 +30,12 @@ class SqlAlchemyUserRepository(UserRepository):
         user.api_key = api_key
         self._session.flush()
         return user
+
+    def set_goals(self, user_id: int, goals: dict[str, float]) -> User | None:
+        user = self._session.get(User, user_id)
+        if user is None:
+            return None
+        for name, value in goals.items():
+            setattr(user, name, value)
+        self._session.flush()
+        return user

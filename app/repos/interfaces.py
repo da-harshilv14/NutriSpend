@@ -20,6 +20,9 @@ class UserRepository(ABC):
     @abstractmethod
     def set_api_key(self, user_id: int, api_key: str) -> User | None: ...
 
+    @abstractmethod
+    def set_goals(self, user_id: int, goals: dict[str, float]) -> User | None: ...
+
 
 class NutritionRepository(ABC):
     @abstractmethod

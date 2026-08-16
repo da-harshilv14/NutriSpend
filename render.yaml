@@ -1,0 +1,25 @@
+# Render Blueprint — deploys the NutriSpend API as a native Python web service.
+# Secrets (sync:false) are entered once in the Render dashboard, never committed.
+services:
+  - type: web
+    name: nutrispend-api
+    runtime: python
+    plan: free
+    region: singapore  # closest free region to India / Supabase
+    buildCommand: pip install -r requirements.txt
+    # Migrations run on every boot (alembic is a no-op once at head), then the server starts.
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.6"
+      - key: DATABASE_URL
+        sync: false   # Supabase pooler URL (port 6543)
+      - key: LLM_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false   # generate a fresh strong secret for prod
+      - key: LLM_BASE_URL
+        value: https://aicredits.in/v1
+      - key: LLM_MODEL
+        value: anthropic/claude-haiku-4.5

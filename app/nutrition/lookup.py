@@ -10,6 +10,9 @@ from app.repos.interfaces import NutritionRepository
 # top two are near-tied) HITL confirmation kicks in — the EDA lesson encoded.
 CONFIDENT_SCORE = 0.8
 AMBIGUOUS_GAP = 0.1
+# Web/api-sourced values are best-effort guesses — always confirm them, even on
+# a later exact match, until a user has verified one by logging it.
+UNVERIFIED_SOURCES = ("websearch", "api")
 
 
 @dataclass(frozen=True)
@@ -33,6 +36,8 @@ def needs_confirmation(result: LookupResult) -> bool:
     best = result.best
     if best is None:
         return True  # nothing found — must ask the user
+    if best.reference.source in UNVERIFIED_SOURCES:
+        return True  # web/api guess — confirm regardless of how it matched
     if best.match_type == "exact":
         return False
     if best.score < CONFIDENT_SCORE:
@@ -73,17 +78,22 @@ class FuzzyMatchLink(NutritionLookupLink):
         repo: NutritionRepository,
         next_link: NutritionLookupLink | None = None,
         *,
-        limit: int = 5,
+        limit: int = 6,
         threshold: float = 0.3,
+        accept_score: float = 0.48,
     ) -> None:
         super().__init__(next_link)
         self._repo = repo
         self._limit = limit
         self._threshold = threshold
+        # If the best fuzzy match is weaker than this, the dataset has nothing
+        # close (e.g. "paneer dum biryani" only weakly hits "Paneer kheer") — fall
+        # through to a web estimate instead of offering a wrong chip.
+        self._accept_score = accept_score
 
     def handle(self, query: str) -> list[NutritionCandidate]:
         scored = self._repo.search_fuzzy(query, limit=self._limit, threshold=self._threshold)
-        if not scored:
+        if not scored or scored[0][1] < self._accept_score:
             return self._delegate(query)
         return [
             NutritionCandidate(reference=reference, score=score, match_type="fuzzy")
