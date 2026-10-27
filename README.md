@@ -163,8 +163,7 @@ box), and access to an OpenAI-compatible LLM endpoint.
 # 1. Install
 pip install -r requirements.txt
 
-# 2. Configure — copy and fill in your values
-cp .env.example .env
+# 2. Configure — create a .env with the variables from the Configuration table below
 #   DATABASE_URL, LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, JWT_SECRET
 
 # 3. Migrate + seed nutrition data

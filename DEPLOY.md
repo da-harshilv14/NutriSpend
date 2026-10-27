@@ -15,7 +15,7 @@ Legend: `[ ]` you do it · `[C]` Claude can do it in this repo · `[R]` on Rende
 
 ## Phase 1 — Backend prep (code)  ✅ done in this repo
 - `[C]` `render.yaml` blueprint (build/start/health/env) — **done**
-- `[C]` `.env.example` documenting required vars — **done**
+- `[C]` Required env vars documented in `README.md` (Configuration table) — **done**
 - `[C]` Confirm Alembic + config read the DB URL from env vars (not just `.env`) — **done**
 - `[C]` Confirm `.env` is gitignored — **done**
 - `[ ]` *(optional, later)* rate-limit `/chat` to cap LLM spend

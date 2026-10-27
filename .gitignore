@@ -8,8 +8,10 @@ __pycache__/
 .venv/
 venv/
 
-# Secrets & config — .env.example IS committed as the template
+# Secrets & local config
 .env
+.env.example
+.claude/
 
 # Runtime logs (structured JSON per run)
 logs/
