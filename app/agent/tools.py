@@ -53,6 +53,9 @@ class LogExpenseTool(Tool):
     }
 
     def run(self, context: ToolContext, *, amount, category=None, description=None, food_log_id=None) -> dict:
+        if amount is None or amount <= 0:
+            return {"error": "An expense needs a positive rupee amount. If the user only "
+                    "ate or drank something (no money spent), use log_food instead."}
         entry = context.expense_service.log_expense(
             user_id=context.user_id, amount=amount, category=category,
             description=description, food_log_id=food_log_id,
