@@ -2,7 +2,7 @@ import time
 
 from fastapi import FastAPI, Request
 
-from app.api import auth, chat, tracking, users
+from app.api import auth, chat, foods, tracking, users
 from app.core.observability import log_request, register_db_listeners, start_metrics
 from app.db.health import ping_database
 from app.db.session import engine
@@ -36,3 +36,4 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(chat.router)
 app.include_router(tracking.router)
+app.include_router(foods.router)

@@ -18,11 +18,13 @@ from app.nutrition.lookup import build_nutrition_lookup
 from app.repos.expense_log_repo import SqlAlchemyExpenseLogRepository
 from app.repos.food_log_repo import SqlAlchemyFoodLogRepository
 from app.repos.nutrition_repo import SqlAlchemyNutritionRepository
+from app.repos.user_food_repo import SqlAlchemyUserFoodRepository
 from app.repos.user_repo import SqlAlchemyUserRepository
 from app.services.auth_service import AuthService
 from app.services.expense_service import ExpenseService
 from app.services.food_service import FoodService
 from app.services.nutrition_service import NutritionService
+from app.services.user_food_service import UserFoodService
 
 # Stateless singletons — reused across requests (no per-request state).
 _settings = get_settings()
@@ -53,6 +55,7 @@ class Services:
     food: FoodService
     expense: ExpenseService
     nutrition: NutritionService
+    user_food: UserFoodService
 
 
 def get_services(session: Session = Depends(get_session)) -> Services:
@@ -65,6 +68,7 @@ def get_services(session: Session = Depends(get_session)) -> Services:
         food=FoodService(SqlAlchemyFoodLogRepository(session), nutrition_repo, lookup),
         expense=ExpenseService(SqlAlchemyExpenseLogRepository(session)),
         nutrition=NutritionService(lookup),
+        user_food=UserFoodService(SqlAlchemyUserFoodRepository(session)),
     )
 
 

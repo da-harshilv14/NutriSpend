@@ -76,3 +76,35 @@ def test_list_only_users_own(service):
     foods = service.list(1)
 
     assert [f.name_normalized for f in foods] == ["poha"]
+
+
+def test_update_rename_recomputes_normalized_name(service):
+    food = service.create(user_id=1, name="Poha", calories_per_100g=110)
+
+    updated = service.update(1, food.id, {"name": "  Kanda  Poha "})
+
+    assert updated.name == "Kanda  Poha"
+    assert updated.name_normalized == "kanda poha"
+
+
+def test_update_rename_to_existing_name_raises_duplicate(service):
+    service.create(user_id=1, name="Poha", calories_per_100g=110)
+    upma = service.create(user_id=1, name="Upma", calories_per_100g=120)
+
+    with pytest.raises(DuplicateFoodError):
+        service.update(1, upma.id, {"name": "POHA"})
+
+
+def test_update_rename_blank_raises_value_error(service):
+    food = service.create(user_id=1, name="Poha", calories_per_100g=110)
+
+    with pytest.raises(ValueError):
+        service.update(1, food.id, {"name": "   "})
+
+
+def test_update_rejects_protected_fields(service):
+    food = service.create(user_id=1, name="Poha", calories_per_100g=110)
+
+    for bad in ("user_id", "id", "source", "created_at", "name_normalized"):
+        with pytest.raises(ValueError):
+            service.update(1, food.id, {bad: "x"})

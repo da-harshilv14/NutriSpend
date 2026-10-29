@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 
 # --- auth ---
@@ -74,3 +74,66 @@ class FoodCreate(BaseModel):
     food_name: str | None = None
     portion_text: str = "1 serving"
     nutrition_id: int | None = None
+
+
+# --- personal foods ---
+def _clean_name(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if not value:
+        raise ValueError("name must not be blank")
+    return value
+
+
+class FoodItemCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    calories_per_100g: float = Field(gt=0)
+    protein_per_100g: float | None = Field(default=None, ge=0)
+    carbs_per_100g: float | None = Field(default=None, ge=0)
+    fats_per_100g: float | None = Field(default=None, ge=0)
+    sugar_per_100g: float | None = Field(default=None, ge=0)
+    serving_size: float | None = Field(default=None, gt=0)
+    serving_unit: str | None = Field(default=None, max_length=50)
+
+    _strip_name = field_validator("name")(_clean_name)
+
+
+class FoodItemUpdate(BaseModel):
+    # Only these fields exist on the model, so protected columns (id, user_id,
+    # source, created_at) can never reach the service. Use exclude_unset when dumping.
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    calories_per_100g: float | None = Field(default=None, gt=0)
+    protein_per_100g: float | None = Field(default=None, ge=0)
+    carbs_per_100g: float | None = Field(default=None, ge=0)
+    fats_per_100g: float | None = Field(default=None, ge=0)
+    sugar_per_100g: float | None = Field(default=None, ge=0)
+    serving_size: float | None = Field(default=None, gt=0)
+    serving_unit: str | None = Field(default=None, max_length=50)
+
+    _strip_name = field_validator("name")(_clean_name)
+
+    @model_validator(mode="after")
+    def _required_fields_not_null(self):
+        for field in ("name", "calories_per_100g"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} cannot be null")
+        return self
+
+
+class FoodItemResponse(BaseModel):
+    id: int
+    name: str
+    calories_per_100g: float | None
+    protein_per_100g: float | None
+    carbs_per_100g: float | None
+    fats_per_100g: float | None
+    sugar_per_100g: float | None
+    serving_size: float | None
+    serving_unit: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class FoodListResponse(BaseModel):
+    foods: list[FoodItemResponse]
