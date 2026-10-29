@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from datetime import date
 
-from app.db.models import ExpenseLog, FoodLog, NutritionReference, User
+from app.db.models import ExpenseLog, FoodLog, NutritionReference, User, UserFood
 
 
 class UserRepository(ABC):
@@ -38,6 +38,33 @@ class NutritionRepository(ABC):
 
     @abstractmethod
     def add(self, reference: NutritionReference) -> NutritionReference: ...
+
+
+class UserFoodRepository(ABC):
+    """Per-user personal foods. Every method is scoped by user_id."""
+
+    @abstractmethod
+    def list_for_user(self, user_id: int) -> list[UserFood]: ...
+
+    @abstractmethod
+    def get(self, user_id: int, food_id: int) -> UserFood | None: ...
+
+    @abstractmethod
+    def get_by_normalized_name(self, user_id: int, name_normalized: str) -> UserFood | None: ...
+
+    @abstractmethod
+    def search_fuzzy(
+        self, user_id: int, name_normalized: str, *, limit: int = 6, threshold: float = 0.3
+    ) -> list[tuple[UserFood, float]]: ...
+
+    @abstractmethod
+    def add(self, food: UserFood) -> UserFood: ...
+
+    @abstractmethod
+    def update(self, user_id: int, food_id: int, fields: dict) -> UserFood | None: ...
+
+    @abstractmethod
+    def delete(self, user_id: int, food_id: int) -> bool: ...
 
 
 class FoodLogRepository(ABC):

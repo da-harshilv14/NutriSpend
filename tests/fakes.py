@@ -1,12 +1,13 @@
 from datetime import date
 
 from app.adapters.web_search import SearchResult, WebSearch
-from app.db.models import ExpenseLog, FoodLog, NutritionReference, User
+from app.db.models import ExpenseLog, FoodLog, NutritionReference, User, UserFood
 from app.llm.client import LLMClient, LLMResponse
 from app.repos.interfaces import (
     ExpenseLogRepository,
     FoodLogRepository,
     NutritionRepository,
+    UserFoodRepository,
     UserRepository,
 )
 
@@ -79,6 +80,60 @@ class FakeNutritionRepository(NutritionRepository):
         scored = [(r, s) for r, s in scored if s >= threshold]
         scored.sort(key=lambda pair: pair[1], reverse=True)
         return scored[:limit]
+
+
+class FakeUserFoodRepository(UserFoodRepository):
+    def __init__(self) -> None:
+        self.rows: dict[int, UserFood] = {}
+        self._next_id = 0
+
+    def list_for_user(self, user_id):
+        foods = [f for f in self.rows.values() if f.user_id == user_id]
+        return sorted(foods, key=lambda f: f.name_normalized)
+
+    def get(self, user_id, food_id):
+        food = self.rows.get(food_id)
+        return food if food is not None and food.user_id == user_id else None
+
+    def get_by_normalized_name(self, user_id, name_normalized):
+        return next(
+            (
+                f
+                for f in self.rows.values()
+                if f.user_id == user_id and f.name_normalized == name_normalized
+            ),
+            None,
+        )
+
+    def search_fuzzy(self, user_id, name_normalized, *, limit=6, threshold=0.3):
+        scored = [
+            (f, _char_similarity(name_normalized, f.name_normalized))
+            for f in self.rows.values()
+            if f.user_id == user_id
+        ]
+        scored = [(f, s) for f, s in scored if s >= threshold]
+        scored.sort(key=lambda pair: pair[1], reverse=True)
+        return scored[:limit]
+
+    def add(self, food: UserFood) -> UserFood:
+        self._next_id += 1
+        food.id = self._next_id
+        self.rows[food.id] = food
+        return food
+
+    def update(self, user_id, food_id, fields):
+        food = self.get(user_id, food_id)
+        if food is None:
+            return None
+        for name, value in fields.items():
+            setattr(food, name, value)
+        return food
+
+    def delete(self, user_id, food_id):
+        if self.get(user_id, food_id) is None:
+            return False
+        del self.rows[food_id]
+        return True
 
 
 class FakeFoodLogRepository(FoodLogRepository):
