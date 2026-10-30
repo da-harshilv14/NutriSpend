@@ -71,10 +71,10 @@ class FoodService:
             reference = self._nutrition_repo.get_by_id(food_id)
             if reference is None:
                 raise ValueError(f"unknown nutrition_id: {food_id}")
-            is_estimate = reference.source in UNVERIFIED_SOURCES
-            if is_estimate:
-                reference.source = "user"  # a user chose to log it -> now verified
-            user_food = self._ensure_user_food(user_id, reference)
+            user_food, created = self._ensure_user_food(user_id, reference)
+            # Only a freshly copied web/api guess is an estimate; a reused
+            # personal food carries the user's own values.
+            is_estimate = created and reference.source in UNVERIFIED_SOURCES
         portion = resolve_portion(portion_text)
         snapshot = scale_nutrition(user_food, portion.grams)
         entry = FoodLog(
@@ -89,13 +89,16 @@ class FoodService:
         )
         return self._food_repo.add(entry)
 
-    def _ensure_user_food(self, user_id: int, reference: NutritionReference) -> UserFood:
-        """The user's personal copy of a shared food (reused if already there)."""
+    def _ensure_user_food(
+        self, user_id: int, reference: NutritionReference
+    ) -> tuple[UserFood, bool]:
+        """The user's personal copy of a shared food, as (food, created_new);
+        reused if already there."""
         name_normalized = normalize_name(reference.name)
         existing = self._user_food_repo.get_by_normalized_name(user_id, name_normalized)
         if existing is not None:
-            return existing
-        return self._user_food_repo.add(
+            return existing, False
+        created = self._user_food_repo.add(
             UserFood(
                 user_id=user_id,
                 name=reference.name,
@@ -110,6 +113,7 @@ class FoodService:
                 source="user",
             )
         )
+        return created, True
 
     def entry_name(self, entry: FoodLog) -> str | None:
         """Dish name for a log entry: personal food first, else the shared

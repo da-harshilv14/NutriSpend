@@ -22,7 +22,7 @@ def _food_service(nutrition_repo):
     return FoodService(FakeFoodLogRepository(), nutrition_repo, user_food_repo, lookup)
 
 
-def test_log_food_snapshots_and_promotes_source():
+def test_log_food_does_not_promote_shared_source():
     ref = NutritionReference(
         name="Sushi", name_normalized="sushi", source="websearch",
         calories_per_100g=200, protein_per_100g=10,
@@ -34,7 +34,7 @@ def test_log_food_snapshots_and_promotes_source():
 
     assert entry.quantity_grams == 150
     assert entry.calories == 300 and entry.protein == 15  # 200/100 * 150
-    assert ref.source == "user"  # web guess, once logged, becomes verified
+    assert ref.source == "websearch"  # shared row untouched; only the user's copy is "user"
 
 
 def test_food_summary_totals():

@@ -170,3 +170,27 @@ def test_log_food_tool_confirmation_path_copies_forward_shared_food():
 
     assert result["status"] == "logged" and result["food"] == "Sushi"
     assert food_repo.entries[0].user_food_id == user_food_repo.list_for_user(1)[0].id
+
+
+def test_log_does_not_mutate_shared_reference_source():
+    ref = _ref(name="Sushi", source="websearch")
+    service, *_ = _setup([ref])
+
+    service.log_food(user_id=1, origin="reference", food_id=ref.id, portion_text="100g")
+
+    assert ref.source == "websearch"
+
+
+def test_log_web_food_reuses_existing_personal_food_without_estimate():
+    ref = _ref(name="Sushi", source="websearch", cal=150.0)
+    service, _, user_food_repo, _ = _setup([ref])
+    mine = user_food_repo.add(
+        UserFood(user_id=1, name="Sushi", name_normalized="sushi", calories_per_100g=300.0)
+    )
+
+    entry = service.log_food(user_id=1, origin="reference", food_id=ref.id, portion_text="100g")
+
+    assert entry.is_estimate is False
+    assert entry.user_food_id == mine.id
+    assert entry.calories == 300.0  # the user's own values, not the web guess
+    assert len(user_food_repo.list_for_user(1)) == 1
