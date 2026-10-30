@@ -2,9 +2,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from app.adapters.nutrition_source import NutritionSource
-from app.db.models import NutritionReference
+from app.db.models import NutritionReference, UserFood
 from app.nutrition.text import normalize_name
-from app.repos.interfaces import NutritionRepository
+from app.repos.interfaces import NutritionRepository, UserFoodRepository
 
 # A fuzzy hit is trusted outright only above this score; below it (or when the
 # top two are near-tied) HITL confirmation kicks in — the EDA lesson encoded.
@@ -17,9 +17,10 @@ UNVERIFIED_SOURCES = ("websearch", "api")
 
 @dataclass(frozen=True)
 class NutritionCandidate:
-    reference: NutritionReference
+    reference: NutritionReference | UserFood
     score: float
-    match_type: str  # 'exact' | 'fuzzy' | 'api' | 'websearch'
+    match_type: str  # 'personal' | 'exact' | 'fuzzy' | 'api' | 'websearch'
+    origin: str = "reference"  # 'user' (personal food) | 'reference' (shared)
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,8 @@ def needs_confirmation(result: LookupResult) -> bool:
     best = result.best
     if best is None:
         return True  # nothing found — must ask the user
+    if best.match_type == "personal":
+        return False  # the user's own saved food — trust it outright
     if best.reference.source in UNVERIFIED_SOURCES:
         return True  # web/api guess — confirm regardless of how it matched
     if best.match_type == "exact":
@@ -54,10 +57,38 @@ class NutritionLookupLink(ABC):
         self._next = next_link
 
     @abstractmethod
-    def handle(self, query: str) -> list[NutritionCandidate]: ...
+    def handle(self, query: str, user_id: int | None) -> list[NutritionCandidate]: ...
 
-    def _delegate(self, query: str) -> list[NutritionCandidate]:
-        return self._next.handle(query) if self._next else []
+    def _delegate(self, query: str, user_id: int | None) -> list[NutritionCandidate]:
+        return self._next.handle(query, user_id) if self._next else []
+
+
+class PersonalFoodLink(NutritionLookupLink):
+    """Head of the chain: the user's own foods win over the shared dataset.
+    Returns at most one candidate (exact, else a strong fuzzy hit)."""
+
+    def __init__(
+        self,
+        user_food_repo: UserFoodRepository,
+        next_link: NutritionLookupLink | None = None,
+        *,
+        accept_score: float = 0.6,
+    ) -> None:
+        super().__init__(next_link)
+        self._repo = user_food_repo
+        self._accept_score = accept_score
+
+    def handle(self, query: str, user_id: int | None) -> list[NutritionCandidate]:
+        if user_id is None:
+            return self._delegate(query, user_id)
+        match = self._repo.get_by_normalized_name(user_id, query)
+        if match is not None:
+            return [NutritionCandidate(reference=match, score=1.0, match_type="personal", origin="user")]
+        scored = self._repo.search_fuzzy(user_id, query, limit=1)
+        if scored and scored[0][1] >= self._accept_score:
+            food, score = scored[0]
+            return [NutritionCandidate(reference=food, score=score, match_type="personal", origin="user")]
+        return self._delegate(query, user_id)
 
 
 class ExactMatchLink(NutritionLookupLink):
@@ -65,11 +96,11 @@ class ExactMatchLink(NutritionLookupLink):
         super().__init__(next_link)
         self._repo = repo
 
-    def handle(self, query: str) -> list[NutritionCandidate]:
+    def handle(self, query: str, user_id: int | None) -> list[NutritionCandidate]:
         match = self._repo.get_by_normalized_name(query)
         if match is None:
-            return self._delegate(query)
-        return [NutritionCandidate(reference=match, score=1.0, match_type="exact")]
+            return self._delegate(query, user_id)
+        return [NutritionCandidate(reference=match, score=1.0, match_type="exact", origin="reference")]
 
 
 class FuzzyMatchLink(NutritionLookupLink):
@@ -91,12 +122,12 @@ class FuzzyMatchLink(NutritionLookupLink):
         # through to a web estimate instead of offering a wrong chip.
         self._accept_score = accept_score
 
-    def handle(self, query: str) -> list[NutritionCandidate]:
+    def handle(self, query: str, user_id: int | None) -> list[NutritionCandidate]:
         scored = self._repo.search_fuzzy(query, limit=self._limit, threshold=self._threshold)
         if not scored or scored[0][1] < self._accept_score:
-            return self._delegate(query)
+            return self._delegate(query, user_id)
         return [
-            NutritionCandidate(reference=reference, score=score, match_type="fuzzy")
+            NutritionCandidate(reference=reference, score=score, match_type="fuzzy", origin="reference")
             for reference, score in scored
         ]
 
@@ -115,10 +146,10 @@ class ExternalSourceLink(NutritionLookupLink):
         self._source = source
         self._repo = repo
 
-    def handle(self, query: str) -> list[NutritionCandidate]:
+    def handle(self, query: str, user_id: int | None) -> list[NutritionCandidate]:
         data = self._source.lookup(query)
         if data is None:
-            return self._delegate(query)
+            return self._delegate(query, user_id)
         reference = self._repo.add(
             NutritionReference(
                 name=data.name,
@@ -131,26 +162,35 @@ class ExternalSourceLink(NutritionLookupLink):
                 source=self._source.source_name,
             )
         )
-        return [NutritionCandidate(reference=reference, score=1.0, match_type=self._source.source_name)]
+        return [
+            NutritionCandidate(
+                reference=reference,
+                score=1.0,
+                match_type=self._source.source_name,
+                origin="reference",
+            )
+        ]
 
 
 class NutritionLookup:
     def __init__(self, head: NutritionLookupLink) -> None:
         self._head = head
 
-    def find(self, food_name: str) -> LookupResult:
+    def find(self, food_name: str, user_id: int | None = None) -> LookupResult:
         query = normalize_name(food_name)
-        return LookupResult(query=food_name, candidates=self._head.handle(query))
+        return LookupResult(query=food_name, candidates=self._head.handle(query, user_id))
 
 
 def build_nutrition_lookup(
     repo: NutritionRepository,
+    user_food_repo: UserFoodRepository,
     api_source: NutritionSource,
     websearch_source: NutritionSource,
 ) -> NutritionLookup:
-    # Cheapest / most reliable first: exact -> fuzzy -> api -> websearch.
+    # Personal first, then cheapest / most reliable: exact -> fuzzy -> api -> websearch.
     websearch = ExternalSourceLink(websearch_source, repo)
     api = ExternalSourceLink(api_source, repo, websearch)
     fuzzy = FuzzyMatchLink(repo, api)
     exact = ExactMatchLink(repo, fuzzy)
-    return NutritionLookup(exact)
+    personal = PersonalFoodLink(user_food_repo, exact)
+    return NutritionLookup(personal)

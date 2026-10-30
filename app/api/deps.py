@@ -60,15 +60,16 @@ class Services:
 
 def get_services(session: Session = Depends(get_session)) -> Services:
     nutrition_repo = SqlAlchemyNutritionRepository(session)
+    user_food_repo = SqlAlchemyUserFoodRepository(session)
     lookup = build_nutrition_lookup(
-        nutrition_repo, StubApiSource(), WebSearchNutritionSource(_web_search, _llm)
+        nutrition_repo, user_food_repo, StubApiSource(), WebSearchNutritionSource(_web_search, _llm)
     )
     return Services(
         auth=AuthService(SqlAlchemyUserRepository(session)),
         food=FoodService(SqlAlchemyFoodLogRepository(session), nutrition_repo, lookup),
         expense=ExpenseService(SqlAlchemyExpenseLogRepository(session)),
         nutrition=NutritionService(lookup),
-        user_food=UserFoodService(SqlAlchemyUserFoodRepository(session)),
+        user_food=UserFoodService(user_food_repo),
     )
 
 

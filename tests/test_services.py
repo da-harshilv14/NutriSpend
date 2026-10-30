@@ -9,12 +9,15 @@ from tests.fakes import (
     FakeExpenseLogRepository,
     FakeFoodLogRepository,
     FakeNutritionRepository,
+    FakeUserFoodRepository,
     FakeUserRepository,
 )
 
 
 def _food_service(nutrition_repo):
-    lookup = build_nutrition_lookup(nutrition_repo, StubApiSource(), StubWebSearchSource())
+    lookup = build_nutrition_lookup(
+        nutrition_repo, FakeUserFoodRepository(), StubApiSource(), StubWebSearchSource()
+    )
     return FoodService(FakeFoodLogRepository(), nutrition_repo, lookup)
 
 
