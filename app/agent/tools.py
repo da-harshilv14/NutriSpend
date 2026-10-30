@@ -85,11 +85,12 @@ class LogFoodTool(Tool):
     def run(self, context: ToolContext, *, food_name=None, portion_text="1 serving", nutrition_id=None) -> dict:
         if nutrition_id is not None:
             entry = context.food_service.log_food(
-                user_id=context.user_id, nutrition_id=nutrition_id, portion_text=portion_text
+                user_id=context.user_id, origin="reference", food_id=nutrition_id, portion_text=portion_text
             )
-            return self._logged(entry, name=context.food_service.reference_name(entry.nutrition_id))
+            return self._logged(entry, name=context.food_service.entry_name(entry))
 
-        preview = context.food_service.preview_food(food_name=food_name, portion_text=portion_text)
+        preview = context.food_service.preview_food(
+            user_id=context.user_id, food_name=food_name, portion_text=portion_text)
         if preview.needs_confirmation:
             best_source = preview.lookup.best.reference.source if preview.lookup.best else None
             candidate_count = len(preview.lookup.candidates)
@@ -116,7 +117,8 @@ class LogFoodTool(Tool):
             }
         best = preview.lookup.best
         entry = context.food_service.log_food(
-            user_id=context.user_id, nutrition_id=best.reference.id, portion_text=portion_text
+            user_id=context.user_id, origin=best.origin, food_id=best.reference.id,
+            portion_text=portion_text,
         )
         return self._logged(entry, name=best.reference.name)
 

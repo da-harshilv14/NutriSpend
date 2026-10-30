@@ -15,10 +15,11 @@ from tests.fakes import (
 
 
 def _food_service(nutrition_repo):
+    user_food_repo = FakeUserFoodRepository()
     lookup = build_nutrition_lookup(
-        nutrition_repo, FakeUserFoodRepository(), StubApiSource(), StubWebSearchSource()
+        nutrition_repo, user_food_repo, StubApiSource(), StubWebSearchSource()
     )
-    return FoodService(FakeFoodLogRepository(), nutrition_repo, lookup)
+    return FoodService(FakeFoodLogRepository(), nutrition_repo, user_food_repo, lookup)
 
 
 def test_log_food_snapshots_and_promotes_source():
@@ -29,7 +30,7 @@ def test_log_food_snapshots_and_promotes_source():
     nutrition_repo = FakeNutritionRepository([ref])
     service = _food_service(nutrition_repo)
 
-    entry = service.log_food(user_id=1, nutrition_id=ref.id, portion_text="150g")
+    entry = service.log_food(user_id=1, origin="reference", food_id=ref.id, portion_text="150g")
 
     assert entry.quantity_grams == 150
     assert entry.calories == 300 and entry.protein == 15  # 200/100 * 150
@@ -40,8 +41,8 @@ def test_food_summary_totals():
     ref = NutritionReference(name="Rice", name_normalized="rice", source="dataset", calories_per_100g=100)
     nutrition_repo = FakeNutritionRepository([ref])
     service = _food_service(nutrition_repo)
-    service.log_food(user_id=1, nutrition_id=ref.id, portion_text="200g")  # 200 kcal
-    service.log_food(user_id=1, nutrition_id=ref.id, portion_text="100g")  # 100 kcal
+    service.log_food(user_id=1, origin="reference", food_id=ref.id, portion_text="200g")  # 200 kcal
+    service.log_food(user_id=1, origin="reference", food_id=ref.id, portion_text="100g")  # 100 kcal
     day = today()
     summary = service.summary(user_id=1, start=day, end=day)
     assert summary["calories"] == 300 and summary["entries"] == 2

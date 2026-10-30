@@ -66,7 +66,7 @@ def get_services(session: Session = Depends(get_session)) -> Services:
     )
     return Services(
         auth=AuthService(SqlAlchemyUserRepository(session)),
-        food=FoodService(SqlAlchemyFoodLogRepository(session), nutrition_repo, lookup),
+        food=FoodService(SqlAlchemyFoodLogRepository(session), nutrition_repo, user_food_repo, lookup),
         expense=ExpenseService(SqlAlchemyExpenseLogRepository(session)),
         nutrition=NutritionService(lookup),
         user_food=UserFoodService(user_food_repo),

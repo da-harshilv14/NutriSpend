@@ -57,14 +57,17 @@ def create_food(
 ) -> dict:
     if body.nutrition_id is not None:
         entry = services.food.log_food(
-            user_id=user.id, nutrition_id=body.nutrition_id, portion_text=body.portion_text
+            user_id=user.id, origin="reference", food_id=body.nutrition_id,
+            portion_text=body.portion_text,
         )
         return _food_entry(entry)
 
     if not body.food_name:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "food_name or nutrition_id is required")
 
-    preview = services.food.preview_food(food_name=body.food_name, portion_text=body.portion_text)
+    preview = services.food.preview_food(
+        user_id=user.id, food_name=body.food_name, portion_text=body.portion_text
+    )
     if needs_confirmation(preview.lookup):
         return {
             "status": "needs_confirmation",
@@ -78,7 +81,8 @@ def create_food(
         }
     best = preview.lookup.best
     entry = services.food.log_food(
-        user_id=user.id, nutrition_id=best.reference.id, portion_text=body.portion_text
+        user_id=user.id, origin=best.origin, food_id=best.reference.id,
+        portion_text=body.portion_text,
     )
     return _food_entry(entry, name=best.reference.name)
 
