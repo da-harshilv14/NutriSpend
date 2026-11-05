@@ -1,9 +1,10 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 from app.adapters.web_search import SearchResult, WebSearch
-from app.db.models import ExpenseLog, FoodLog, NutritionReference, User, UserFood
+from app.db.models import ChatMessage, ExpenseLog, FoodLog, NutritionReference, User, UserFood
 from app.llm.client import LLMClient, LLMResponse
 from app.repos.interfaces import (
+    ChatMessageRepository,
     ExpenseLogRepository,
     FoodLogRepository,
     NutritionRepository,
@@ -190,6 +191,29 @@ class FakeExpenseLogRepository(ExpenseLogRepository):
         for name, value in fields.items():
             setattr(entry, name, value)
         return entry
+
+
+class FakeChatMessageRepository(ChatMessageRepository):
+    def __init__(self) -> None:
+        self.messages: list[ChatMessage] = []
+        self._next_id = 0
+
+    def add(self, message: ChatMessage) -> ChatMessage:
+        self._next_id += 1
+        message.id = self._next_id
+        if message.created_at is None:  # the real column fills this via server_default
+            message.created_at = datetime.now(timezone.utc)
+        self.messages.append(message)
+        return message
+
+    def list_since(self, user_id, since: datetime):
+        rows = [m for m in self.messages if m.user_id == user_id and m.created_at >= since]
+        return sorted(rows, key=lambda m: (m.created_at, m.id))
+
+    def delete_before(self, user_id, cutoff: datetime) -> int:
+        doomed = [m for m in self.messages if m.user_id == user_id and m.created_at < cutoff]
+        self.messages = [m for m in self.messages if m not in doomed]
+        return len(doomed)
 
 
 class ScriptedLLM(LLMClient):

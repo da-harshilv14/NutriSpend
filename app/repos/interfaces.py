@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from datetime import date
+from datetime import date, datetime
 
-from app.db.models import ExpenseLog, FoodLog, NutritionReference, User, UserFood
+from app.db.models import ChatMessage, ExpenseLog, FoodLog, NutritionReference, User, UserFood
 
 
 class UserRepository(ABC):
@@ -93,3 +93,14 @@ class ExpenseLogRepository(ABC):
 
     @abstractmethod
     def update(self, user_id: int, expense_id: int, fields: dict) -> ExpenseLog | None: ...
+
+
+class ChatMessageRepository(ABC):
+    @abstractmethod
+    def add(self, message: ChatMessage) -> ChatMessage: ...
+
+    @abstractmethod
+    def list_since(self, user_id: int, since: datetime) -> list[ChatMessage]: ...
+
+    @abstractmethod
+    def delete_before(self, user_id: int, cutoff: datetime) -> int: ...
