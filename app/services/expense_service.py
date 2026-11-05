@@ -30,6 +30,24 @@ class ExpenseService:
         )
         return self._expense_repo.add(entry)
 
+    def update_expense(
+        self,
+        *,
+        user_id: int,
+        expense_id: int,
+        amount: float | str | Decimal | None = None,
+        category: str | None = None,
+        description: str | None = None,
+    ) -> ExpenseLog | None:
+        fields: dict = {}
+        if amount is not None:
+            fields["amount"] = Decimal(str(amount))
+        if category is not None:
+            fields["category"] = category
+        if description is not None:
+            fields["description"] = description
+        return self._expense_repo.update(user_id, expense_id, fields)
+
     def list_for_period(self, *, user_id: int, start: date, end: date) -> list[ExpenseLog]:
         return self._expense_repo.list_for_period(user_id, start, end)
 

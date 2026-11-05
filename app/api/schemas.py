@@ -70,6 +70,13 @@ class ExpenseCreate(BaseModel):
     description: str | None = None
 
 
+class ExpenseUpdate(BaseModel):
+    # Absolute values for the logged expense; omitted fields are left unchanged.
+    amount: float | None = Field(default=None, gt=0)
+    category: str | None = None
+    description: str | None = None
+
+
 class FoodCreate(BaseModel):
     food_name: str | None = None
     portion_text: str = "1 serving"

@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.deps import Services, get_current_user, get_services
-from app.api.schemas import ExpenseCreate, FoodCreate, FoodLogUpdate
+from app.api.schemas import ExpenseCreate, ExpenseUpdate, FoodCreate, FoodLogUpdate
 from app.core.dates import resolve_period, today
 from app.db.models import User
 from app.nutrition.lookup import needs_confirmation
@@ -31,6 +31,23 @@ def create_expense(
     entry = services.expense.log_expense(
         user_id=user.id, amount=body.amount, category=body.category, description=body.description
     )
+    return {"id": entry.id, "amount": float(entry.amount), "category": entry.category,
+            "description": entry.description, "log_date": str(entry.log_date)}
+
+
+@router.patch("/expenses/{expense_id}")
+def update_expense(
+    expense_id: int,
+    body: ExpenseUpdate,
+    user: User = Depends(get_current_user),
+    services: Services = Depends(get_services),
+) -> dict:
+    fields = body.model_dump(exclude_none=True)
+    if not fields:
+        raise HTTPException(422, "no fields to update")
+    entry = services.expense.update_expense(user_id=user.id, expense_id=expense_id, **fields)
+    if entry is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "expense not found")
     return {"id": entry.id, "amount": float(entry.amount), "category": entry.category,
             "description": entry.description, "log_date": str(entry.log_date)}
 

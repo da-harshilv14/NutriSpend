@@ -27,3 +27,17 @@ class SqlAlchemyExpenseLogRepository(ExpenseLogRepository):
             .order_by(ExpenseLog.log_date)
         )
         return list(self._session.scalars(statement))
+
+    def get(self, user_id: int, expense_id: int) -> ExpenseLog | None:
+        return self._session.scalar(
+            select(ExpenseLog).where(ExpenseLog.user_id == user_id, ExpenseLog.id == expense_id)
+        )
+
+    def update(self, user_id: int, expense_id: int, fields: dict) -> ExpenseLog | None:
+        entry = self.get(user_id, expense_id)
+        if entry is None:
+            return None
+        for name, value in fields.items():
+            setattr(entry, name, value)
+        self._session.flush()
+        return entry

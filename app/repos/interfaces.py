@@ -87,3 +87,9 @@ class ExpenseLogRepository(ABC):
 
     @abstractmethod
     def list_for_period(self, user_id: int, start: date, end: date) -> list[ExpenseLog]: ...
+
+    @abstractmethod
+    def get(self, user_id: int, expense_id: int) -> ExpenseLog | None: ...
+
+    @abstractmethod
+    def update(self, user_id: int, expense_id: int, fields: dict) -> ExpenseLog | None: ...
