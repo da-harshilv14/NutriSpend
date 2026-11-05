@@ -99,7 +99,7 @@ class FoodLog(Base):
         ForeignKey("nutrition_reference.id"), default=None
     )
     user_food_id: Mapped[int | None] = mapped_column(
-        ForeignKey("user_food.id"), default=None
+        ForeignKey("user_food.id", ondelete="SET NULL"), default=None
     )
 
     quantity_grams: Mapped[float]
