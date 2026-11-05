@@ -15,12 +15,14 @@ from app.db.models import User
 from app.db.session import SessionLocal
 from app.llm.openai_adapter import OpenAICompatibleAdapter
 from app.nutrition.lookup import build_nutrition_lookup
+from app.repos.chat_message_repo import SqlAlchemyChatMessageRepository
 from app.repos.expense_log_repo import SqlAlchemyExpenseLogRepository
 from app.repos.food_log_repo import SqlAlchemyFoodLogRepository
 from app.repos.nutrition_repo import SqlAlchemyNutritionRepository
 from app.repos.user_food_repo import SqlAlchemyUserFoodRepository
 from app.repos.user_repo import SqlAlchemyUserRepository
 from app.services.auth_service import AuthService
+from app.services.chat_message_service import ChatMessageService
 from app.services.expense_service import ExpenseService
 from app.services.food_service import FoodService
 from app.services.nutrition_service import NutritionService
@@ -56,6 +58,7 @@ class Services:
     expense: ExpenseService
     nutrition: NutritionService
     user_food: UserFoodService
+    chat_message: ChatMessageService | None = None
 
 
 def get_services(session: Session = Depends(get_session)) -> Services:
@@ -70,6 +73,7 @@ def get_services(session: Session = Depends(get_session)) -> Services:
         expense=ExpenseService(SqlAlchemyExpenseLogRepository(session)),
         nutrition=NutritionService(lookup),
         user_food=UserFoodService(user_food_repo),
+        chat_message=ChatMessageService(SqlAlchemyChatMessageRepository(session)),
     )
 
 

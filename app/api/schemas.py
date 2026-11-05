@@ -63,6 +63,17 @@ class ChatResponse(BaseModel):
     receipts: list[dict] = []  # what got logged this turn: [{title, amount, calories}]
 
 
+class ChatHistoryMessage(BaseModel):
+    id: int
+    kind: str  # "user" | "assistant" | "receipt" (receipt content is JSON)
+    content: str
+    created_at: str  # ISO 8601
+
+
+class ChatHistoryResponse(BaseModel):
+    messages: list[ChatHistoryMessage]
+
+
 # --- tracking ---
 class ExpenseCreate(BaseModel):
     amount: float
