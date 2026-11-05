@@ -27,3 +27,17 @@ class SqlAlchemyFoodLogRepository(FoodLogRepository):
             .order_by(FoodLog.log_date)
         )
         return list(self._session.scalars(statement))
+
+    def get(self, user_id: int, food_log_id: int) -> FoodLog | None:
+        return self._session.scalar(
+            select(FoodLog).where(FoodLog.user_id == user_id, FoodLog.id == food_log_id)
+        )
+
+    def update(self, user_id: int, food_log_id: int, fields: dict) -> FoodLog | None:
+        entry = self.get(user_id, food_log_id)
+        if entry is None:
+            return None
+        for name, value in fields.items():
+            setattr(entry, name, value)
+        self._session.flush()
+        return entry

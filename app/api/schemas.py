@@ -76,6 +76,16 @@ class FoodCreate(BaseModel):
     nutrition_id: int | None = None
 
 
+class FoodLogUpdate(BaseModel):
+    # Absolute values for the logged entry; omitted fields are left unchanged.
+    calories: float | None = Field(default=None, ge=0)
+    protein: float | None = Field(default=None, ge=0)
+    carbs: float | None = Field(default=None, ge=0)
+    fats: float | None = Field(default=None, ge=0)
+    sugar: float | None = Field(default=None, ge=0)
+    portion_text: str | None = None
+
+
 # --- personal foods ---
 def _clean_name(value: str | None) -> str | None:
     if value is None:

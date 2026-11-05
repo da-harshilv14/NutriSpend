@@ -74,6 +74,12 @@ class FoodLogRepository(ABC):
     @abstractmethod
     def list_for_period(self, user_id: int, start: date, end: date) -> list[FoodLog]: ...
 
+    @abstractmethod
+    def get(self, user_id: int, food_log_id: int) -> FoodLog | None: ...
+
+    @abstractmethod
+    def update(self, user_id: int, food_log_id: int, fields: dict) -> FoodLog | None: ...
+
 
 class ExpenseLogRepository(ABC):
     @abstractmethod

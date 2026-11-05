@@ -150,6 +150,19 @@ class FakeFoodLogRepository(FoodLogRepository):
     def list_for_period(self, user_id, start: date, end: date):
         return [e for e in self.entries if e.user_id == user_id and start <= e.log_date <= end]
 
+    def get(self, user_id, food_log_id):
+        return next(
+            (e for e in self.entries if e.id == food_log_id and e.user_id == user_id), None
+        )
+
+    def update(self, user_id, food_log_id, fields):
+        entry = self.get(user_id, food_log_id)
+        if entry is None:
+            return None
+        for name, value in fields.items():
+            setattr(entry, name, value)
+        return entry
+
 
 class FakeExpenseLogRepository(ExpenseLogRepository):
     def __init__(self) -> None:

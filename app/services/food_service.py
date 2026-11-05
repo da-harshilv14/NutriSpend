@@ -89,6 +89,54 @@ class FoodService:
         )
         return self._food_repo.add(entry)
 
+    def update_food_log(
+        self,
+        *,
+        user_id: int,
+        food_log_id: int,
+        calories: float | None = None,
+        protein: float | None = None,
+        carbs: float | None = None,
+        fats: float | None = None,
+        sugar: float | None = None,
+        portion_text: str | None = None,
+    ) -> FoodLog | None:
+        """Edit a logged food. Nutrients are stored exactly as typed (no
+        rescaling); a new portion only re-resolves the grams. If the entry is
+        linked to a personal food, the edited nutrients also correct its
+        per-100g values, so future logs start from the fixed numbers."""
+        entry = self._food_repo.get(user_id, food_log_id)
+        if entry is None:
+            return None
+
+        edited = {
+            name: value
+            for name, value in (
+                ("calories", calories),
+                ("protein", protein),
+                ("carbs", carbs),
+                ("fats", fats),
+                ("sugar", sugar),
+            )
+            if value is not None
+        }
+        fields: dict = dict(edited)
+        if portion_text is not None:
+            fields["portion_text"] = portion_text
+            fields["quantity_grams"] = resolve_portion(portion_text).grams
+        updated = self._food_repo.update(user_id, food_log_id, fields)
+        if updated is None:
+            return None
+
+        grams = updated.quantity_grams
+        if updated.user_food_id is not None and grams and grams > 0 and edited:
+            self._user_food_repo.update(
+                user_id,
+                updated.user_food_id,
+                {f"{name}_per_100g": value / grams * 100 for name, value in edited.items()},
+            )
+        return updated
+
     def _ensure_user_food(
         self, user_id: int, reference: NutritionReference
     ) -> tuple[UserFood, bool]:

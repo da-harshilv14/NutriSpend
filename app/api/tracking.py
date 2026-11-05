@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.deps import Services, get_current_user, get_services
-from app.api.schemas import ExpenseCreate, FoodCreate
+from app.api.schemas import ExpenseCreate, FoodCreate, FoodLogUpdate
 from app.core.dates import resolve_period, today
 from app.db.models import User
 from app.nutrition.lookup import needs_confirmation
@@ -96,6 +96,22 @@ def list_food(
     start, end = _period(period)
     entries = services.food.list_for_period(user_id=user.id, start=start, end=end)
     return {"period": period, "food": [_food_entry(e) for e in entries]}
+
+
+@router.patch("/food/{food_log_id}")
+def update_food(
+    food_log_id: int,
+    body: FoodLogUpdate,
+    user: User = Depends(get_current_user),
+    services: Services = Depends(get_services),
+) -> dict:
+    fields = body.model_dump(exclude_none=True)
+    if not fields:
+        raise HTTPException(422, "no fields to update")
+    entry = services.food.update_food_log(user_id=user.id, food_log_id=food_log_id, **fields)
+    if entry is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "food entry not found")
+    return _food_entry(entry, name=services.food.entry_name(entry))
 
 
 @router.get("/summary")
