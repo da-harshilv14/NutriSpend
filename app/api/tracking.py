@@ -188,6 +188,8 @@ def history(
             "amount": float(expense.amount),
             "calories": None,
             "is_estimate": False,
+            "food_id": None,
+            "expense_id": expense.id,
             "_food_log_id": expense.food_log_id,
             "_id": None,
         })
@@ -204,6 +206,8 @@ def history(
             "amount": None,
             "calories": entry.calories,
             "is_estimate": entry.is_estimate,
+            "food_id": entry.id,
+            "expense_id": None,
             "_food_log_id": None,
             "_id": entry.id,
         })
@@ -230,6 +234,8 @@ def history(
                     "amount": e["amount"],
                     "calories": food["calories"],
                     "is_estimate": food["is_estimate"],
+                    "food_id": food["food_id"],
+                    "expense_id": e["expense_id"],
                 }
 
         merged = []
