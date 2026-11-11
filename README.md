@@ -98,7 +98,7 @@ to a real web estimate rather than surfacing a confidently-wrong dish.
 
 ```mermaid
 flowchart LR
-    Q[dish name + user] --> P{your personal<br/>food? (user_food)}
+    Q[dish name + user] --> P{in your personal<br/>food list?}
     P -- yes --> R[verified → auto-log]
     P -- no --> E{exact shared match?}
     E -- yes --> R
