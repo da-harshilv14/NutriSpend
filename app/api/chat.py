@@ -24,6 +24,8 @@ def chat(
         nutrition_service=services.nutrition,
     )
     result = agent.run(user_message=body.message, context=context, history=body.history)
+    # Shares this turn's transaction with the agent's tool writes: a persistence
+    # failure rolls back the whole turn (atomic), it is not a separate record.
     services.chat_message.record_turn(
         user_id=user.id,
         user_message=body.message,

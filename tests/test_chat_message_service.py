@@ -89,7 +89,7 @@ def test_recent_respects_days_window():
     assert [r.content for r in rows] == ["one"]
 
 
-def test_recent_orders_by_created_at_then_id():
+def test_recent_orders_by_created_at():
     service, repo = _service()
     repo.add(_old(1, 1, "later"))
     repo.add(_old(1, 3, "earlier"))
@@ -97,6 +97,22 @@ def test_recent_orders_by_created_at_then_id():
     rows = service.recent(user_id=1)
 
     assert [r.content for r in rows] == ["earlier", "later"]
+
+
+def test_recent_tiebreaks_equal_created_at_by_id():
+    service, repo = _service()
+    ts = datetime.now(timezone.utc) - timedelta(minutes=5)
+    # Stored in reverse id order so only the (created_at, id) sort can fix it
+    # (a stable sort on created_at alone would keep insertion order).
+    for mid, content in ((3, "third"), (1, "first"), (2, "second")):
+        repo.messages.append(
+            ChatMessage(id=mid, user_id=1, kind="user", content=content, created_at=ts)
+        )
+
+    rows = service.recent(user_id=1)
+
+    assert [r.id for r in rows] == [1, 2, 3]
+    assert [r.content for r in rows] == ["first", "second", "third"]
 
 
 def test_receipt_content_is_json_roundtrip():
