@@ -24,13 +24,19 @@ the web only when it must, and it never passes a guess off as a fact.
 
 - **One-message logging** — expense + food in a single natural-language turn.
 - **Indian-food nutrition** — seeded from a 1,000+ dish dataset, extended live.
+- **Personal food list** — each user builds their own food library (a **Foods**
+  tab). Lookups search it first, and anything you log is copied into it, so your
+  foods auto-log next time with your own values.
 - **Trustworthy estimates** — web-sourced values are flagged (`EST.`) and always
-  confirmed with you before logging; verified dataset matches log silently.
+  confirmed with you before logging; verified matches log silently.
 - **Human-in-the-loop** — ambiguous dishes return pickable candidates, not a
   wrong guess.
+- **Editable logs** — fix a logged entry's calories, servings, or price after the
+  fact; correcting a food also updates your saved copy of it.
 - **Per-user goals** — daily budget + calorie/macro targets, editable, server-stored.
 - **Insights** — today/week summaries, spend-by-hour, and a merged day-by-day history.
-- **Self-improving cache** — a food you confirm once is remembered as verified.
+- **Durable chat** — the conversation persists (rolling 7-day server window + a
+  permanent on-device archive) with WhatsApp-style day dividers.
 
 ---
 
@@ -52,7 +58,7 @@ network).
 | Web fallback | DuckDuckGo (`ddgs`) + LLM extraction |
 | Auth | Custom JWT (PyJWT) + bcrypt |
 | Config | pydantic-settings |
-| Tests | pytest (fully offline, 24 tests, ~1s) |
+| Tests | pytest (fully offline, 108 tests) |
 
 ### The chat turn (agent + tools)
 
@@ -85,25 +91,29 @@ sequenceDiagram
 
 ### Nutrition lookup — Chain of Responsibility
 
-Each link answers if it can, otherwise delegates. Character-based fuzzy matching
-is *not* semantic, so a weak match falls through to a real web estimate rather
-than surfacing a confidently-wrong dish.
+Each link answers if it can, otherwise delegates. The user's **personal list is
+searched first** (a confident personal match auto-logs — it's their own food).
+Character-based fuzzy matching is *not* semantic, so a weak match falls through
+to a real web estimate rather than surfacing a confidently-wrong dish.
 
 ```mermaid
 flowchart LR
-    Q[dish name] --> E{exact match?}
-    E -- yes --> R[verified nutrition]
+    Q[dish name + user] --> P{your personal<br/>food? (user_food)}
+    P -- yes --> R[verified → auto-log]
+    P -- no --> E{exact shared match?}
+    E -- yes --> R
     E -- no --> F{fuzzy pg_trgm<br/>score ≥ 0.48?}
     F -- yes --> C[ranked candidates]
     F -- no --> A{structured API?}
     A -- hit --> W2[estimate → confirm]
     A -- miss --> W[web search + LLM extract]
-    W --> CB[(cache-back into<br/>nutrition_reference)]
+    W --> CB[(cache into<br/>nutrition_reference)]
     CB --> W2
 ```
 
-Web/API values are marked unverified and always require confirmation; confirming
-one **promotes** it to a verified source, so the second time it's instant.
+Web/API values are marked unverified and always require confirmation. When you
+log a food, a per-user copy is added to your personal list (**copy-forward**), so
+next time that dish resolves from your own list and auto-logs.
 
 ---
 
@@ -115,19 +125,21 @@ app/
 ├── api/                    HTTP layer (thin; delegates to services)
 │   ├── auth.py             /auth/signup, /auth/login → JWT
 │   ├── users.py            /me, PATCH /me (api key), PATCH /me/goals
-│   ├── chat.py             POST /chat → runs the agent
-│   ├── tracking.py         expenses, food, summaries, hourly, history, lookup
+│   ├── foods.py            /foods CRUD — per-user personal food list
+│   ├── chat.py             POST /chat (agent) · GET /chat/history
+│   ├── tracking.py         expenses, food, PATCH edits, summaries, hourly, history, lookup
 │   ├── deps.py             DI wiring; per-request txn boundary; current user
 │   └── schemas.py          pydantic request/response models
 ├── agent/                  agent.py (tool loop) · tools.py · prompt.py
 ├── llm/                    LLMClient interface + OpenAI-compatible adapter
-├── nutrition/              lookup (CoR) · portions · scaling · text-normalize
-├── adapters/              web_search (ddgs) · web/API nutrition sources
-├── services/               auth · food · expense · nutrition (business rules)
+├── nutrition/              lookup (CoR, personal-first) · portions · scaling · text-normalize
+├── adapters/               web_search (ddgs) · web/API nutrition sources
+├── services/               auth · food · expense · nutrition · user_food · chat_message
 ├── repos/                  interfaces + SQLAlchemy implementations
 ├── db/                     models · session · health · seed_nutrition
 └── core/                   config · security · dates (IST) · observability
-migrations/                 Alembic (0001 schema+pg_trgm, 0002 is_estimate, 0003 goals)
+migrations/                 Alembic 0001–0007 (schema+pg_trgm · is_estimate · goals ·
+                            user_food · food_log.user_food_id (+ON DELETE SET NULL) · chat_message)
 tests/                      offline fakes (in-memory repos, scripted LLM)
 ```
 
@@ -143,11 +155,16 @@ All routes require `Authorization: Bearer <jwt>` except `/health`, `/auth/*`.
 | `PATCH` | `/me` | Set personal LLM API key |
 | `PATCH` | `/me/goals` | Update daily goals (partial) |
 | `POST` | `/chat` | Conversational logging (the agent) |
+| `GET` | `/chat/history` | Durable chat history (rolling 7 days) |
+| `GET` / `POST` | `/foods` | List / add personal foods |
+| `GET` / `PATCH` / `DELETE` | `/foods/{id}` | Read / edit / remove a personal food |
 | `POST` / `GET` | `/expenses` | Log / list expenses |
+| `PATCH` | `/expenses/{id}` | Edit a logged expense (amount/category/description) |
 | `POST` / `GET` | `/food` | Log / list food |
+| `PATCH` | `/food/{id}` | Edit a logged food (calories/servings; propagates to your food) |
 | `GET` | `/summary` | Spend or calories for today/week |
 | `GET` | `/summary/hourly` | Spend bucketed by hour of day |
-| `GET` | `/history` | Merged day-by-day expenses + food |
+| `GET` | `/history` | Merged day-by-day expenses + food (with entry ids for editing) |
 | `GET` | `/nutrition/lookup` | Look up a dish without logging |
 
 Interactive docs at `/docs` when running.
@@ -212,9 +229,18 @@ full backend + Android release checklist.
   shell can't hijack config.
 - **Historical logs are snapshots** — a food entry stores its computed nutrients,
   so later corrections to a reference never rewrite the past.
-- **Timezone** — day boundaries and hourly buckets use IST (India-facing).
+- **Personal, not shared** — each user's food additions/edits live in their own
+  `user_food`; the shared seed DB is never mutated per-user, so one user's web
+  guess never leaks as "verified" to everyone else.
+- **Durable chat** — turns persist in `chat_message` with a rolling 7-day prune;
+  the phone keeps a permanent archive synced from that window.
+- **Timezone** — day boundaries and hourly buckets use IST (India-facing); chat
+  day dividers use the device's local day.
 
 ## Roadmap
+
+Core is shipped: conversational logging, personal foods, editable logs, goals,
+insights, and durable chat history. Remaining optional pieces:
 
 - Voice replies (TTS) — input already works via on-device speech
 - Remote MCP server so other agents can log on your behalf
